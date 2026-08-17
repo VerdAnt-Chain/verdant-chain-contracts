@@ -2,6 +2,7 @@
 members = [
     "contracts/identity",
     "contracts/verification",
+    "contracts/escrow",
 ]
 resolver = "2"
 
