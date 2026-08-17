@@ -1,10 +1,10 @@
-use soroban_sdk::{contracttype, Address, Bytes};
+use soroban_sdk::{Address, Bytes, contracttype};
 
 #[contracttype]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReleaseCondition {
-    pub kind: u32,          // 0 = Manual, 1 = Milestone, 2 = Timeout
-    pub releaser: Address,  // Manual: authorized releaser; Milestone: proof verifier; unused for Timeout
+    pub kind: u32,           // 0 = Manual, 1 = Milestone, 2 = Timeout
+    pub releaser: Address, // Manual: authorized releaser; Milestone: proof verifier; unused for Timeout
     pub timeout_ledger: u32, // Timeout: ledger after which auto-refund allowed; unused otherwise
 }
 

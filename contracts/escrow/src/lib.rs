@@ -1,13 +1,18 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, panic_with_error, Address, Bytes, Env, token::TokenClient};
+use soroban_sdk::{
+    Address, Bytes, Env, contract, contractimpl, panic_with_error, token::TokenClient,
+};
 
 mod errors;
 mod events;
 mod storage;
+#[cfg(test)]
+#[cfg(test)]
+mod test;
 mod types;
 
 pub use errors::EscrowError;
-pub use events::{Initialized, EscrowCreated, EscrowDeposited, EscrowReleased, EscrowRefunded};
+pub use events::{EscrowCreated, EscrowDeposited, EscrowRefunded, EscrowReleased, Initialized};
 pub use types::{Escrow, ReleaseCondition};
 
 #[contract]
@@ -43,7 +48,7 @@ impl EscrowContract {
         let token_client = TokenClient::new(&env, &token);
 
         // Pull funds from depositor
-        token_client.transfer(&depositor, &env.current_contract_address(), &amount);
+        token_client.transfer(&depositor, env.current_contract_address(), &amount);
 
         let record = Escrow {
             id,
@@ -82,7 +87,7 @@ impl EscrowContract {
         let token_client = TokenClient::new(&env, &token);
 
         // Pull additional funds
-        token_client.transfer(&from, &env.current_contract_address(), &amount);
+        token_client.transfer(&from, env.current_contract_address(), &amount);
 
         record.amount += amount;
         record.updated_ledger = env.ledger().sequence();
@@ -104,20 +109,23 @@ impl EscrowContract {
 
         // Verify authorization based on release condition
         match record.condition.kind {
-            0 => { // Manual
-                if &releaser != &record.condition.releaser {
+            0 => {
+                // Manual
+                if releaser != record.condition.releaser {
                     panic_with_error!(&env, EscrowError::ConditionNotMet);
                 }
             }
-            1 => { // Milestone
-                if &releaser != &record.condition.releaser {
+            1 => {
+                // Milestone
+                if releaser != record.condition.releaser {
                     panic_with_error!(&env, EscrowError::ConditionNotMet);
                 }
                 if proof_hash.is_empty() {
                     panic_with_error!(&env, EscrowError::InvalidInput);
                 }
             }
-            2 => { // Timeout
+            2 => {
+                // Timeout
                 if env.ledger().sequence() < record.condition.timeout_ledger {
                     panic_with_error!(&env, EscrowError::TimeoutNotElapsed);
                 }
@@ -129,7 +137,11 @@ impl EscrowContract {
         let token_client = TokenClient::new(&env, &token);
 
         // Transfer remaining amount to beneficiary
-        token_client.transfer(&env.current_contract_address(), &record.beneficiary, &remaining);
+        token_client.transfer(
+            &env.current_contract_address(),
+            &record.beneficiary,
+            &remaining,
+        );
 
         record.released_amount += remaining;
         record.updated_ledger = env.ledger().sequence();
@@ -160,7 +172,7 @@ impl EscrowContract {
             panic_with_error!(&env, EscrowError::AlreadyFullyReleased);
         }
 
-        if &refundee != &record.depositor {
+        if refundee != record.depositor {
             panic_with_error!(&env, EscrowError::Unauthorized);
         }
 

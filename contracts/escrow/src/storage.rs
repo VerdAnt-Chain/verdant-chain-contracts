@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Bytes, Env};
+use soroban_sdk::{Address, Bytes, Env, contracttype, panic_with_error};
 
 use crate::errors::EscrowError;
 use crate::types::Escrow;
@@ -53,9 +53,7 @@ pub fn set_next_id(env: &Env, id: u64) {
 }
 
 pub fn set_escrow(env: &Env, id: u64, record: &Escrow) {
-    env.storage()
-        .persistent()
-        .set(&DataKey::Escrow(id), record);
+    env.storage().persistent().set(&DataKey::Escrow(id), record);
 }
 
 pub fn get_escrow(env: &Env, id: u64) -> crate::types::Escrow {
