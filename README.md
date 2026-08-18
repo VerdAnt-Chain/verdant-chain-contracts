@@ -1,55 +1,83 @@
-# VerdAnt Contracts
+# VerdAnt Contracts — Project Proposal
 
-Soroban smart contracts implementing the on-chain responsibilities of the
-**VerdAnt** ecosystem: farmer identity, verification, escrow, and financing.
-This repository is owned by **Agent #2 (Contracts Engineer)**.
+**Soroban smart contracts implementing the on-chain responsibilities of the
+VerdAnt ecosystem — farmer identity, verification, escrow, and financing.**
+
+**Document status:** 2026-08-18 · Revision 2
+**Owner:** Agent #2 (Contracts Engineer)
+**Part of:** the VerdAnt three-repository system (this repo, `verdant-backend`,
+`verdant-frontend`).
+
+---
+
+## 1. Background
 
 VerdAnt is open agricultural technology & financial infrastructure built on
-Stellar/Soroban. Per AD-004, only integrity-sensitive state lives on-chain;
-documents/media stay off-chain and are referenced by sha256 hashes.
+Stellar/Soroban. Its value rests on **verifiability**: any counterparty must be
+able to check that a farmer is registered, that a production record was
+verified, that escrowed funds are released only on the agreed condition, and
+that financing milestones are met. Centralized databases cannot provide that
+independent assurance; Soroban contracts can.
 
-## Table of contents
+Per AD-004, only integrity-sensitive state lives on-chain. Documents and media
+stay off-chain and are referenced by sha256 hashes, keeping storage costs
+proportionate while preserving verifiability.
 
-- [Stack](#stack)
-- [Repository role & interface contracts](#repository-role--interface-contracts)
-- [Contracts](#contracts)
-- [Design principles](#design-principles)
-- [Identifiers (AD-009)](#identifiers-ad-009)
-- [Project layout](#project-layout)
-- [Local development](#local-development)
-- [Tests](#tests)
-- [Lint / format](#lint--format)
-- [Events & indexing](#events--indexing)
-- [Roadmap status](#roadmap-status)
+## 2. Objectives
 
-## Stack
+1. Provide an on-chain **farmer identity** that anchors all five VerdAnt
+   pillars (AD-005).
+2. Provide **verification** records (AgroProof) issued and revocable by a
+   designated verification authority.
+3. Provide **escrow** (AgriLease / FarmFund) with programmable release
+   conditions and SEP-41 token support.
+4. Provide **milestone financing** (FarmFund) with programmable release,
+   drawdown, repayment, and default handling.
+5. Emit structured Soroban events consumed by the backend indexer, so on-chain
+   state is reconstructable off-chain.
 
-- **Rust** (edition 2024) · **Soroban SDK 27.0.6**
-- **WASM-optimized release profile** (`opt-level=z`, `lto=true`,
-  `panic=abort`) for deployment
-- Stellar RPC / integration tooling for testnet and local sandbox
-- `soroban-sdk` `testutils` feature for in-env unit tests with ledger
-  snapshots (`test_snapshots/`)
-- Built and deployed via the **Stellar CLI** (`stellar contract build`)
+## 3. Scope
 
-## Repository role & interface contracts
+**In scope.** The `verdant-identity`, `verdant-verification`, `verdant-escrow`,
+and `verdant-financing` contracts; in-env unit tests with ledger snapshots;
+WASM-optimized release builds; deployment/invoke tooling.
 
-One of three VerdAnt repositories (`verdant-backend`, `verdant-frontend`,
-`verdant-contracts`). See [`INSTRUCTIONS.md`](../INSTRUCTIONS.md) at the
-coordination root for the master architecture and the Agent Responsibility
-Table.
+**Out of scope.** Off-chain documents/media (AD-004); on-chain storage of
+`va:`-prefixed identifiers (AD-009); the backend API and frontend surfaces
+(handled by the other repositories).
 
-Contract entrypoints and on-chain state consumed by the backend/frontend are
-documented in [`docs/contracts/`](../docs/contracts/) at the coordination root
-— that is the **contract of record** for on-chain ↔ off-chain integration.
-Indexer event subscription formats live in [`docs/events/`](../docs/events/).
+## 4. Proposed solution & architecture
 
-## Contracts
+Four contracts, each with a typed, documented interface, enforced authorization,
+and a published event set:
 
-### `verdant-identity` — Farmer identity (AgriScout) ✅
+| Contract | Role | Status |
+|----------|------|--------|
+| `verdant-identity` | Farmer identity (AgriScout) | Implemented, 11 tests |
+| `verdant-verification` | AgroProof verification | Implemented, 14 tests |
+| `verdant-escrow` | AgriLease / FarmFund escrow | Implemented, 14 tests |
+| `verdant-financing` | FarmFund milestone financing | Design accepted v1.0; impl pending |
 
-The farmer is the central identity across all five pillars (AD-005). A farmer
-is a Stellar account; the contract records registration, metadata hashes, and
+**Stack.** Rust (edition 2024) · Soroban SDK 27.0.6 · Stellar RPC/integration
+tooling · WASM-optimized release profile (`opt-level=z`, `lto=true`,
+`panic=abort`) · `soroban-sdk` `testutils` for in-env tests with ledger
+snapshots · Stellar CLI (`stellar contract build`) for builds/deploys.
+
+**Design principles.**
+
+- **Stellar must earn its place.** Only identity, ownership, verification
+  state, escrow, financing state, settlement, transitions, and proofs go
+  on-chain; documents/media stay off-chain referenced by hash (AD-004).
+- **Authorization is enforced per entrypoint** with Stellar `require_auth`;
+  both authorized and unauthorized paths are tested.
+- **Shared VerdAnt primitives over per-module reinvention.**
+- **Interface-first.** Entrypoints, state, and events are documented before
+  implementation and verified against the code on acceptance.
+
+### 4.1 `verdant-identity` — Farmer identity (AgriScout)
+
+The farmer is the central identity across all five pillars (AD-005). A farmer is
+a Stellar account; the contract records registration, metadata hashes, and
 verification markers.
 
 | Entrypoint | Signature | Authorization |
@@ -62,9 +90,9 @@ verification markers.
 | `is_registered` | `is_registered(farmer: Address) -> bool` | none (read) |
 
 Events: `Initialized`, `FarmerRegistered`, `FarmerMetadataUpdated`,
-`VerificationMarkerSet`. Tests: **11 passing**.
+`VerificationMarkerSet`.
 
-### `verdant-verification` — AgroProof ✅
+### 4.2 `verdant-verification` — AgroProof
 
 Production/supply-chain verification records. The verification authority
 (backend) issues and revokes verification records against a batch reference.
@@ -78,9 +106,8 @@ Production/supply-chain verification records. The verification authority
 | `get_batch_verifications` | `get_batch_verifications(batch: Bytes) -> Vec<u64>` | none (read) |
 
 Events: `Initialized`, `VerificationCreated`, `VerificationRevoked`.
-Tests: **14 passing**. Indexer spec: `docs/events/verification.md`.
 
-### `verdant-escrow` — AgriLease / FarmFund escrow ✅
+### 4.3 `verdant-escrow` — AgriLease / FarmFund escrow
 
 Programmatic escrow with release conditions mirroring the booking/financing
 flows. Funds are pulled from the depositor into the contract (SEP-41
@@ -99,58 +126,62 @@ flows. Funds are pulled from the depositor into the contract (SEP-41
 `ReleaseCondition { kind: u32, releaser: Address, timeout_ledger: u32 }` where
 `0 = Manual`, `1 = Milestone`, `2 = Timeout`. Events: `Initialized`,
 `EscrowCreated`, `EscrowDeposited`, `EscrowReleased`, `EscrowRefunded`.
-Tests: **14 passing**. Indexer spec: `docs/events/escrow.md`.
 
-### `verdant-financing` — FarmFund (Phase 7) ⏳
+### 4.4 `verdant-financing` — FarmFund (Phase 7)
 
 Milestone-based agricultural financing with programmable release. Contract
-**design accepted v1.0** (`docs/contracts/financing.md`); implementation not
-yet started. Milestones carry `deadline_ledger`, `proof_hash`, and
-`proof_amount` (positive = release to beneficiary, negative = refund from
-beneficiary); the contract tracks drawdown, repayment, and default.
+**design accepted v1.0**; implementation not yet started. Milestones carry
+`deadline_ledger`, `proof_hash`, and `proof_amount` (positive = release to
+beneficiary, negative = refund from beneficiary); the contract tracks drawdown,
+repayment, and default.
 
-## Design principles
+## 5. Deliverables
 
-- **Stellar must earn its place** — only identity, ownership, verification
-  state, escrow, financing state, settlement, transitions, and proofs go
-  on-chain; documents/media stay off-chain referenced by hash (AD-004, §9).
-- **Authorization is enforced per entrypoint** with Stellar `require_auth`;
-  both authorized and unauthorized paths are tested (§12).
-- **Shared VerdAnt primitives over per-module reinvention** (§3, §8).
-- **Interface-first** — entrypoints, state, and events are documented in
-  `docs/contracts/` before implementation and verified against the code on
-  acceptance.
+### 5.1 Delivered
 
-## Identifiers (AD-009)
+- `verdant-identity`, `verdant-verification`, `verdant-escrow` implemented with
+  passing suites: **39 tests green** (identity 11, verification 14, escrow 14).
+- Escrow tests use the generated client + a registered Stellar asset contract
+  (`register_stellar_asset_contract_v2` + `StellarAssetClient::mint`); other
+  contracts use `mock_all_auths()` client patterns.
+- Ledger snapshots committed under each crate's `test_snapshots/`.
+- Financing design accepted v1.0, addressing deposit semantics, the
+  `proof_amount` field, and refund accounting.
 
-Per [`docs/architecture/identifiers.md`](../docs/architecture/identifiers.md)
-and AD-009:
+### 5.2 Planned
 
-- On-chain keys are **typed** — never `va:`-prefixed.
-- Contract-issued IDs (verification, escrow, financing) are **counter-issued**
-  `u64` decimals, zero-padded to 12 digits at the presentation boundary
-  (e.g. `va:verification:000000000042`). On-chain the counter is a typed `u64`;
-  the `va:` form is rendered only by backend/frontend.
-- Backend-issued reference keys (`va:batch:`, `va:booking:`, `va:asset:`) are
-  UUIDv7, submitted to contracts as typed `Bytes`.
-- `u64` comfortably exceeds 10¹² (12 digits), so counter storage is safe.
+- `verdant-financing` implementation (Phase 7).
+- Deployment scripts + testnet integration (Phase 9+).
+- Financing event spec for the indexer once implemented.
 
-## Project layout
+## 6. Design constraints & standards
 
-```
-contracts/
-├── identity/        # Farmer identity contract (AD-005) — implemented, 11 tests
-├── verification/    # AgroProof verification — implemented, 14 tests
-├── escrow/          # AgriLease/FarmFund escrow — implemented, 14 tests
-├── financing/       # FarmFund financing — design accepted v1.0, impl pending
-└── test_snapshots/  # per-contract ledger snapshots generated by tests
-scripts/             # deploy / invoke tooling (Phase 9+)
-```
+- **Identifiers (AD-009).** On-chain keys are **typed** — never
+  `va:`-prefixed. Contract-issued IDs (verification, escrow, financing) are
+  counter-issued `u64` decimals, zero-padded to 12 digits at the presentation
+  boundary (e.g. `va:verification:000000000042`). On-chain the counter is a
+  typed `u64`; the `va:` form is rendered only by backend/frontend.
+  Backend-issued reference keys (`va:batch:`, `va:booking:`, `va:asset:`) are
+  UUIDv7, submitted to contracts as typed `Bytes`. `u64` comfortably exceeds
+  10¹² (12 digits), so counter storage is safe.
+- **Events are part of the contract.** Every contract publishes Soroban events
+  consumed by the backend indexer; event payloads/topics are documented and part
+  of each contract's acceptance criteria.
 
-Workspace members are declared in the root `Cargo.toml`; a release profile is
-optimized for Soroban WASM deployment.
+## 7. Timeline / roadmap
 
-## Local development
+| Phase | Scope | Status |
+|-------|-------|--------|
+| 1 | Repository foundation, base tooling | Done |
+| — | Shared identifier formats (AD-009, confirmed width in `u64`) | Done |
+| 3 | `verdant-identity` (farmer identity) | Implemented + tested |
+| 5 | `verdant-verification` (AgroProof) | Implemented + tested |
+| 6–7 | `verdant-escrow` | Implemented + tested |
+| 7 | Financing design accepted v1.0 | Done |
+| 7 | `verdant-financing` implementation | Pending |
+| 9+ | Deployment scripts + testnet integration | Pending |
+
+## 8. Development & operations
 
 Prerequisites: Rust (stable), the `wasm32v1-none` target, and the Stellar CLI.
 
@@ -175,37 +206,23 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-## Tests
+## 9. Project layout
 
-```bash
-cargo test --workspace
+```
+contracts/
+├── identity/        # Farmer identity contract (AD-005) — implemented, 11 tests
+├── verification/    # AgroProof verification — implemented, 14 tests
+├── escrow/          # AgriLease/FarmFund escrow — implemented, 14 tests
+├── financing/       # FarmFund financing — design accepted v1.0, impl pending
+└── test_snapshots/  # per-contract ledger snapshots generated by tests
+scripts/             # deploy / invoke tooling (Phase 9+)
 ```
 
-Current suite: **39 tests green** (identity 11, verification 14, escrow 14).
-Escrow tests use the generated client + a registered Stellar asset contract
-(`register_stellar_asset_contract_v2` + `StellarAssetClient::mint`); other
-contracts use `mock_all_auths()` client patterns. Ledger snapshots are
-committed under each crate's `test_snapshots/` (generated by the test
-harness).
+Workspace members are declared in the root `Cargo.toml`; a release profile is
+optimized for Soroban WASM deployment.
 
-## Events & indexing
+## 10. Ownership
 
-Every contract publishes Soroban events consumed by the backend indexer. The
-off-chain subscription formats are the contract of record in
-[`docs/events/`](../docs/events/) (verification, escrow; financing once
-implemented). Event payloads and topics are documented per event and are part
-of the acceptance criteria for each contract.
-
-## Roadmap status
-
-- [x] Phase 1: repository foundation, base tooling
-- [x] Shared identifier formats (AD-009, confirmed width in `u64`)
-- [x] Phase 3: `verdant-identity` (farmer identity) — implemented + tested
-- [x] Phase 5: `verdant-verification` (AgroProof) — implemented + tested
-- [x] Phases 6–7: `verdant-escrow` — implemented + tested
-- [x] Financing design accepted v1.0 (`docs/contracts/financing.md`)
-- [ ] `verdant-financing` implementation (Phase 7)
-- [ ] Deployment scripts + testnet integration (Phase 9+)
-
-The on-chain contract interfaces are documented in
-[`docs/contracts/`](../docs/contracts/) at the coordination root.
+Owned and maintained by **Agent #2 (Contracts Engineer)** as part of the VerdAnt
+program. On-chain interfaces are coordinated through the program's integration
+lead (Agent #4); the coordination root records contract designs and event specs.
