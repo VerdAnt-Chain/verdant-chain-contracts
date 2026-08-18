@@ -3,6 +3,7 @@ members = [
     "contracts/identity",
     "contracts/verification",
     "contracts/escrow",
+    "contracts/financing",
 ]
 resolver = "2"
 
@@ -20,7 +21,6 @@ debug = 0
 strip = "symbols"
 debug-assertions = false
 panic = "abort"
-codegen-units = 1
 lto = true
 
 [profile.release-with-logs]
