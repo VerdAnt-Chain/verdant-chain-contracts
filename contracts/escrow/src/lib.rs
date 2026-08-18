@@ -7,7 +7,6 @@ mod errors;
 mod events;
 mod storage;
 #[cfg(test)]
-#[cfg(test)]
 mod test;
 mod types;
 
