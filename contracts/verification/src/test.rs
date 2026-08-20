@@ -1,6 +1,6 @@
 use soroban_sdk::{Address, Bytes, Env, testutils::Address as _};
 
-use crate::{Verification, VerificationContract, VerificationContractClient, VerificationError};
+use crate::{Verification, VerificationContract, VerificationContractClient};
 
 fn env_with_authority() -> (Env, VerificationContractClient<'static>, Address, Address) {
     let env = Env::default();
@@ -17,10 +17,16 @@ fn hash(env: &Env, value: u32) -> Bytes {
 }
 
 #[test]
-fn initialize_sets_admin_and_authority() {
-    let (env, client, admin, authority) = env_with_authority();
-    let _ = (admin, authority);
-    assert!(true);
+fn initialize_succeeds() {
+    let env = Env::default();
+    let admin = Address::generate(&env);
+    let authority = Address::generate(&env);
+    let contract_id = env.register(VerificationContract, ());
+    let client = VerificationContractClient::new(&env, &contract_id);
+    let result = client
+        .mock_all_auths()
+        .try_initialize(&admin, &authority);
+    assert!(result.is_ok());
 }
 
 #[test]
@@ -129,7 +135,7 @@ fn batch_verifications_indexed() {
 
 #[test]
 fn get_verification_unknown_fails() {
-    let (env, client, _admin, _authority) = env_with_authority();
+    let (_env, client, _admin, _authority) = env_with_authority();
     let result = client.try_get_verification(&999);
     assert!(result.is_err());
 }
