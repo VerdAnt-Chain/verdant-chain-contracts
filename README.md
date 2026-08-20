@@ -200,4 +200,4 @@ optimized for Soroban WASM deployment.
 
 ## License
 
-MIT
+Apache License 2.0. See the `LICENSE` file.
