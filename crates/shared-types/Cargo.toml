@@ -1,0 +1,10 @@
+[package]
+name = "verdant-shared-types"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk.workspace = true
