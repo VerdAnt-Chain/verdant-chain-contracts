@@ -23,9 +23,7 @@ fn initialize_succeeds() {
     let authority = Address::generate(&env);
     let contract_id = env.register(VerificationContract, ());
     let client = VerificationContractClient::new(&env, &contract_id);
-    let result = client
-        .mock_all_auths()
-        .try_initialize(&admin, &authority);
+    let result = client.mock_all_auths().try_initialize(&admin, &authority);
     assert!(result.is_ok());
 }
 

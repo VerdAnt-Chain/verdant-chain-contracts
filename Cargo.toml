@@ -4,6 +4,8 @@ members = [
     "contracts/verification",
     "contracts/escrow",
     "contracts/financing",
+    "contracts/livestock",
+    "crates/shared-types",
 ]
 resolver = "2"
 
